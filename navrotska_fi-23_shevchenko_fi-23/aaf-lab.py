@@ -6,14 +6,14 @@ class RTreeNode:
     """Вузол R-дерева"""
     def __init__(self, is_leaf=True, segment=None):
         self.is_leaf = is_leaf
-        self.segment = segment  # Bounding box [l, h]
-        self.children = []  # Child nodes or segments
-        self.bbox = segment  # The bounding box
+        self.segment = segment  
+        self.children = []  
+        self.bbox = segment  
         self.left = None
         self.right = None
 
     def update_bbox(self):
-        """Оновлення обмежувальну область на основі дочірніх елементів"""
+        """Оновлення обмежувальної області на основі дочірніх елементів"""
         if self.is_leaf:
             self.bbox = [min(child[0] for child in self.children), max(child[1] for child in self.children)]
         else:
@@ -39,11 +39,9 @@ class RTree:
             node.update_bbox()
             return node
 
-        # Sort segments by their start point
         segments.sort(key=lambda x: x[0])
         mid = len(segments) // 2
 
-        # Split into two balanced groups
         left_segments = segments[:mid]
         right_segments = segments[mid:]
 
@@ -212,11 +210,9 @@ class Parser:
             return f'Invalid SEARCH command: invalid {query_type} parameters'
 
 
-# Example usage:
 def main():
     parser = Parser()
 
-    # Test commands
     test_commands = [
         "CREATE segments",
         "INSERT segments [3, 4]",
