@@ -1,13 +1,23 @@
 import re
-COMMANDS = ['CREATE', 'INSERT', 'PRINT_TREE', 'CONTAINS', 'SEARCH']
 
+COMMANDS = ['CREATE', 'INSERT', 'PRINT_TREE', 'CONTAINS', 'SEARCH']
 
 class RTreeNode:
     """Вузол R-дерева"""
-    def __init__(self, segment=None):
-        self.segment = segment  # [l, h]
+    def __init__(self, is_leaf=True, segment=None):
+        self.is_leaf = is_leaf
+        self.segment = segment  # Bounding box [l, h]
+        self.children = []  # Child nodes or segments
+        self.bbox = segment  # The bounding box
         self.left = None
         self.right = None
+
+    def update_bbox(self):
+        """Оновлення обмежувальну область на основі дочірніх елементів"""
+        if self.is_leaf:
+            self.bbox = [min(child[0] for child in self.children), max(child[1] for child in self.children)]
+        else:
+            self.bbox = [min(child.bbox[0] for child in self.children), max(child.bbox[1] for child in self.children)]
 
 
 class RTree:
@@ -17,37 +27,47 @@ class RTree:
         self.segments = []
 
     def insert(self, segment):
-        """Додає відрізок у дерево"""
+        """Вставка відрізка в R-дерево"""
         self.segments.append(segment)
-        if not self.root:
-            self.root = RTreeNode(segment)
-        else:
-            self._insert_node(self.root, segment)
+        self.root = self._build_tree_recursive(self.segments)
 
-    def _insert_node(self, node, segment):
-        """Вставка нового вузла у дерево"""
-        l, h = segment
-        if l < node.segment[0]:  # Ліва сторона
-            if node.left is None:
-                node.left = RTreeNode(segment)
-            else:
-                self._insert_node(node.left, segment)
-        else:  # Права сторона
-            if node.right is None:
-                node.right = RTreeNode(segment)
-            else:
-                self._insert_node(node.right, segment)
+    def _build_tree_recursive(self, segments):
+        """Рекурсивна побудова дерева"""
+        if len(segments) == 1:
+            node = RTreeNode(is_leaf=True, segment=segments[0])
+            node.children = segments
+            node.update_bbox()
+            return node
 
-    def print_tree(self, node=None, level=0):
-        """Рекурсивний друк дерева"""
+        # Sort segments by their start point
+        segments.sort(key=lambda x: x[0])
+        mid = len(segments) // 2
+
+        # Split into two balanced groups
+        left_segments = segments[:mid]
+        right_segments = segments[mid:]
+
+        node = RTreeNode(is_leaf=False)
+        node.children = [self._build_tree_recursive(left_segments), self._build_tree_recursive(right_segments)]
+        node.update_bbox()
+        return node
+
+    def print_tree(self, node=None, level=0, position="Root"):
+        """Вивід дерева з усіма сегментами"""
         if node is None:
             node = self.root
 
-        if node.right:
-            self.print_tree(node.right, level + 1)
-        print('    ' * level + str(node.segment))
-        if node.left:
-            self.print_tree(node.left, level + 1)
+        if node is None:
+            print("Tree is empty")
+            return
+
+        indent = "  " * level
+        if node.is_leaf:
+            print(f"{indent}{position}: {node.bbox}")
+        else:
+            print(f"{indent}{position}:  {node.bbox}")
+            self.print_tree(node.children[0], level + 1, "Left Child")
+            self.print_tree(node.children[1], level + 1, "Right Child")
 
     def contains(self, segment):
         """Перевірка входження сегмента [l, h]"""
@@ -58,9 +78,9 @@ class RTree:
         return False
 
     def search(self, query_type=None, params=None):
-        """Пошук за умовою"""
+        """Пошук відрізків за умовою"""
         results = []
-        if query_type is None:  # Без фільтру
+        if query_type is None:  # No filter
             return self.segments
         elif query_type == 'CONTAINS':
             L, H = params
@@ -83,7 +103,7 @@ class Lexer:
 class Parser:
     def __init__(self):
         self.lexer = Lexer()
-        self.trees = {}  # Зберігає всі множини (R-дерева)
+        self.trees = {}
 
     def parse(self, command):
         tokens = self.lexer.tokenize(command)
@@ -169,7 +189,7 @@ class Parser:
         if set_name not in self.trees:
             return f'Set {set_name} does not exist'
 
-        if len(tokens) == 2:  # SEARCH без WHERE
+        if len(tokens) == 2:
             results = self.trees[set_name].search()
             return f'Search results: {results}'
 
@@ -199,14 +219,19 @@ def main():
     # Test commands
     test_commands = [
         "CREATE segments",
-        "INSERT segments [10, 20]",
-        "INSERT segments [5, 15]",
+        "INSERT segments [3, 4]",
+        "INSERT segments [2, 7]",
+        "INSERT segments [5, 8]",
+        "INSERT segments [4, 6]",
+        "INSERT segments [5, 10]",
         "PRINT_TREE segments",
-        "CONTAINS segments [10, 20]",
+        "CONTAINS segments [5, 8]",
+        "CONTAINS segments [2, 5]",
+        "CONTAINS segments [3, 11]",
         "SEARCH segments",
-        "SEARCH segments WHERE CONTAINS [7, 12]",
-        "SEARCH segments WHERE INTERSECTS [15, 25]",
-        "SEARCH segments WHERE LEFT_OF 15"
+        "SEARCH segments WHERE CONTAINS [7, 8]",
+        "SEARCH segments WHERE INTERSECTS [3, 9]",
+        "SEARCH segments WHERE LEFT_OF 6"
     ]
 
     for cmd in test_commands:
@@ -217,3 +242,9 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+         
+
+    
+       
+    
